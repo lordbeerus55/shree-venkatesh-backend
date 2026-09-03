@@ -63,8 +63,9 @@ app.get('/api/health', (_req, res) => {
 })
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(err)
-  res.status(500).json({ error: 'Internal server error' })
+  console.error('Error:', err.message)
+  console.error(err.stack)
+  res.status(500).json({ error: err.message || 'Internal server error' })
 })
 
 app.listen(PORT, () => {
