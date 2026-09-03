@@ -6,17 +6,6 @@ import { requireAuth } from '../middleware/auth'
 
 const router = Router()
 
-// Add CORS headers to all auth routes
-router.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*')
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200)
-  }
-  next()
-})
-
 router.post('/login', async (req: Request, res: Response) => {
   const { username, password } = req.body
   if (!username || !password) {
