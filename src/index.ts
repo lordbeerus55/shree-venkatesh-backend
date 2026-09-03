@@ -44,7 +44,17 @@ app.use(express.urlencoded({ extended: true }))
 
 app.use('/uploads', express.static(path.join(__dirname, '..', process.env.UPLOAD_DIR || 'uploads')))
 
-app.use('/api/auth', authRoutes)
+// Add CORS to auth routes
+app.use('/api/auth', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204)
+    return
+  }
+  next()
+}, authRoutes)
 
 app.use('/api/users', requireAuth, userRoutes)
 app.use('/api/markets', requireAuth, marketRoutes)
