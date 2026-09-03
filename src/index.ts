@@ -24,7 +24,14 @@ import timingRoutes from './routes/timings'
 const app = express()
 const PORT = process.env.PORT || 5000
 
-// CORS configuration - allow all origins
+// CORS - must be before all routes
+app.options('*', cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false
+}))
+
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
