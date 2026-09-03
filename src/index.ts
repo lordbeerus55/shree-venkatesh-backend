@@ -24,21 +24,20 @@ import timingRoutes from './routes/timings'
 const app = express()
 const PORT = process.env.PORT || 5000
 
-// CORS - must be before all routes
-app.options('*', cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: false
-}))
-
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: false,
-  optionsSuccessStatus: 200
-}))
+// Simple CORS middleware - must be first
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.setHeader('Access-Control-Max-Age', '86400')
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204)
+    return
+  }
+  
+  next()
+})
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
