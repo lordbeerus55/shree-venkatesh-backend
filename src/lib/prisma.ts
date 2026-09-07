@@ -29,6 +29,10 @@ export async function initializeDatabase(): Promise<void> {
     console.log('Initial admin account created')
   }
 
+  await secureLegacyCustomerMpins()
+}
+
+export async function secureLegacyCustomerMpins(): Promise<number> {
   const users = await prisma.user.findMany({ select: { id: true, mpinHash: true } })
   const legacyUsers = users.filter((user) => !user.mpinHash.startsWith('$2'))
   for (const user of legacyUsers) {
@@ -38,6 +42,7 @@ export async function initializeDatabase(): Promise<void> {
     })
   }
   if (legacyUsers.length) console.log(`Secured ${legacyUsers.length} customer MPIN(s)`)
+  return legacyUsers.length
 }
 
 export default prisma

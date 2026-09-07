@@ -1,90 +1,61 @@
-import { Bid, GameRate, Result } from '@prisma/client'
+import { Bid, Prisma, Result } from '@prisma/client'
+import { GameType, isDoublePana, isPana, isSinglePana, isTriplePana, isValidBidNumber } from './validation'
 
 type BidWithResult = Bid & { result?: Result | null }
 
 function panaDigit(pana: string): string {
-  const sum = pana.split('').reduce((a, c) => a + parseInt(c, 10), 0)
+  const sum = pana.split('').reduce((total, digit) => total + Number(digit), 0)
   return String(sum % 10)
 }
 
-function isDoublePana(pana: string): boolean {
-  const digits = pana.split('')
-  return (
-    (digits[0] === digits[1] || digits[1] === digits[2] || digits[0] === digits[2]) &&
-    digits[0] !== digits[1] || digits[1] !== digits[2]
-  )
-}
-
-function isTriplePana(pana: string): boolean {
-  return pana[0] === pana[1] && pana[1] === pana[2]
-}
-
-export function calculateWin(bid: BidWithResult, result: Result, rates: GameRate): number {
-  const { session, gameType, number, amount } = bid
-  const amt = Number(amount)
+export function calculateWin(bid: BidWithResult, result: Result): Prisma.Decimal {
+  const zero = new Prisma.Decimal(0)
+  const gameType = bid.gameType as GameType
+  if (!isValidBidNumber(gameType, bid.number)) return zero
 
   const openPana = result.openPana ?? ''
   const closePana = result.closePana ?? ''
-  const openDigit = result.openDigit ?? (openPana ? panaDigit(openPana) : '')
-  const closeDigit = result.closeDigit ?? (closePana ? panaDigit(closePana) : '')
+  const openDigit = result.openDigit ?? (isPana(openPana) ? panaDigit(openPana) : '')
+  const closeDigit = result.closeDigit ?? (isPana(closePana) ? panaDigit(closePana) : '')
   const jodi = result.jodi ?? (openDigit && closeDigit ? openDigit + closeDigit : '')
-
-  const targetPana = session === 'open' ? openPana : closePana
-  const targetDigit = session === 'open' ? openDigit : closeDigit
+  const targetPana = bid.session === 'open' ? openPana : closePana
+  const targetDigit = bid.session === 'open' ? openDigit : closeDigit
+  let won = false
 
   switch (gameType) {
-    case 'single':
-      return number === targetDigit ? amt * rates.single : 0
-
-    case 'jodi':
-      return number === jodi ? amt * rates.jodi : 0
-
+    case 'single': won = bid.number === targetDigit; break
+    case 'jodi': won = bid.number === jodi; break
     case 'single_pana':
-      return number === targetPana ? amt * rates.singlePana : 0
-
+    case 'sp': won = bid.number === targetPana && isSinglePana(targetPana); break
     case 'double_pana':
-      return number === targetPana && isDoublePana(targetPana) ? amt * rates.doublePana : 0
-
+    case 'dp': won = bid.number === targetPana && isDoublePana(targetPana); break
     case 'triple_pana':
-      return number === targetPana && isTriplePana(targetPana) ? amt * rates.triplePana : 0
-
-    case 'sp':
-      return number === targetPana ? amt * rates.sp : 0
-
-    case 'dp':
-      return number === targetPana ? amt * rates.dp : 0
-
-    case 'tp':
-      return number === targetPana ? amt * rates.tp : 0
-
+    case 'tp': won = bid.number === targetPana && isTriplePana(targetPana); break
     case 'fp':
-      return number === targetPana ? amt * rates.fp : 0
-
-    case 'cp':
-      return number === targetPana ? amt * rates.cp : 0
-
+    case 'cp': won = bid.number === targetPana && isPana(targetPana); break
     case 'half_sangam': {
-      const [digit, pana] = number.split('-')
-      if (session === 'open') {
-        return digit === openDigit && pana === closePana ? amt * rates.halfSangam : 0
-      }
-      return pana === openPana && digit === closeDigit ? amt * rates.halfSangam : 0
+      const [digit, pana] = bid.number.split('-')
+      won = bid.session === 'open'
+        ? digit === openDigit && pana === closePana
+        : pana === openPana && digit === closeDigit
+      break
     }
-
     case 'full_sangam': {
-      const [pana1, pana2] = number.split('-')
-      return pana1 === openPana && pana2 === closePana ? amt * rates.fullSangam : 0
+      const [open, close] = bid.number.split('-')
+      won = open === openPana && close === closePana
+      break
     }
-
-    default:
-      return 0
+    default: return zero
   }
+  return won ? bid.amount.mul(bid.payoutMultiplier) : zero
 }
 
 export function derivePanaDigit(pana: string): string {
+  if (!isPana(pana)) throw new Error('Invalid pana')
   return panaDigit(pana)
 }
 
 export function deriveJodi(openDigit: string, closeDigit: string): string {
+  if (!/^\d$/.test(openDigit) || !/^\d$/.test(closeDigit)) throw new Error('Invalid digits')
   return openDigit + closeDigit
 }

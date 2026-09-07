@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import prisma from '../lib/prisma'
+import { parseId } from '../lib/validation'
 
 const router = Router()
 
@@ -64,11 +65,16 @@ router.post('/:id/schedules', async (req: Request, res: Response) => {
 })
 
 router.put('/:id/schedules/:scheduleId', async (req: Request, res: Response) => {
+  const marketId = parseId(req.params.id)
+  const scheduleId = parseId(req.params.scheduleId)
   const { openTime, closeTime, isActive } = req.body
-  const schedule = await prisma.marketSchedule.update({
-    where: { id: parseInt(req.params.scheduleId) },
+  if (!marketId || !scheduleId) { res.status(400).json({ error: 'Invalid market or schedule id' }); return }
+  const updated = await prisma.marketSchedule.updateMany({
+    where: { id: scheduleId, marketId },
     data: { openTime, closeTime, isActive },
   })
+  if (updated.count !== 1) { res.status(404).json({ error: 'Schedule not found for market' }); return }
+  const schedule = await prisma.marketSchedule.findUnique({ where: { id: scheduleId } })
   res.json(schedule)
 })
 
