@@ -33,7 +33,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/:id/revert', async (req: Request, res: Response) => {
   const bid = await prisma.bid.findUnique({
     where: { id: parseInt(req.params.id) },
-    include: { user: true },
+    include: { user: { select: { id: true, walletBalance: true } } },
   })
   if (!bid) { res.status(404).json({ error: 'Bid not found' }); return }
   if (bid.status === 'reverted') {

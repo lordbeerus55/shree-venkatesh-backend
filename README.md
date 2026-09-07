@@ -35,9 +35,8 @@ Server runs on **http://localhost:5000**
 
 ---
 
-## Default Admin Credentials
-- **Username**: `admin`
-- **Password**: `admin@123`
+## Initial Admin Credentials
+Set `INITIAL_ADMIN_USERNAME` and `INITIAL_ADMIN_PASSWORD` in the deployment environment when provisioning an empty database. Existing installations keep their current administrator account.
 
 ---
 

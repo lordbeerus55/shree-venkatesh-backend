@@ -1,10 +1,11 @@
 import 'dotenv/config'
 import express from 'express'
-import cors from 'cors'
 import path from 'path'
-import { requireAuth } from './middleware/auth'
+import { requireAdmin, requireAuth, requireWriteAccess } from './middleware/auth'
+import { initializeDatabase } from './lib/prisma'
 
 import authRoutes from './routes/auth'
+import accountRoutes from './routes/accounts'
 import userRoutes from './routes/users'
 import marketRoutes from './routes/markets'
 import gameRateRoutes from './routes/gameRates'
@@ -23,6 +24,8 @@ import timingRoutes from './routes/timings'
 
 const app = express()
 const PORT = process.env.PORT || 5000
+
+app.set('trust proxy', 1)
 
 // Simple CORS middleware - must be first
 app.use((req, res, next) => {
@@ -60,21 +63,22 @@ app.use('/api/auth', (req, res, next) => {
   next()
 }, authRoutes)
 
-app.use('/api/users', requireAuth, userRoutes)
-app.use('/api/markets', requireAuth, marketRoutes)
-app.use('/api/game-rates', requireAuth, gameRateRoutes)
-app.use('/api/results', requireAuth, resultRoutes)
-app.use('/api/bids', requireAuth, bidRoutes)
-app.use('/api/wallet', requireAuth, walletRoutes)
-app.use('/api/deposits', requireAuth, depositRoutes)
-app.use('/api/withdrawals', requireAuth, withdrawalRoutes)
-app.use('/api/reports', requireAuth, reportRoutes)
-app.use('/api/notifications', requireAuth, notificationRoutes)
-app.use('/api/slider', requireAuth, sliderRoutes)
-app.use('/api/settings', requireAuth, settingRoutes)
-app.use('/api/contents', requireAuth, contentRoutes)
-app.use('/api/payments', requireAuth, paymentRoutes)
-app.use('/api/timings', requireAuth, timingRoutes)
+app.use('/api/accounts', requireAuth, requireAdmin, accountRoutes)
+app.use('/api/users', requireAuth, requireWriteAccess, userRoutes)
+app.use('/api/markets', requireAuth, requireWriteAccess, marketRoutes)
+app.use('/api/game-rates', requireAuth, requireWriteAccess, gameRateRoutes)
+app.use('/api/results', requireAuth, requireWriteAccess, resultRoutes)
+app.use('/api/bids', requireAuth, requireWriteAccess, bidRoutes)
+app.use('/api/wallet', requireAuth, requireWriteAccess, walletRoutes)
+app.use('/api/deposits', requireAuth, requireWriteAccess, depositRoutes)
+app.use('/api/withdrawals', requireAuth, requireWriteAccess, withdrawalRoutes)
+app.use('/api/reports', requireAuth, requireWriteAccess, reportRoutes)
+app.use('/api/notifications', requireAuth, requireWriteAccess, notificationRoutes)
+app.use('/api/slider', requireAuth, requireWriteAccess, sliderRoutes)
+app.use('/api/settings', requireAuth, requireWriteAccess, settingRoutes)
+app.use('/api/contents', requireAuth, requireWriteAccess, contentRoutes)
+app.use('/api/payments', requireAuth, requireWriteAccess, paymentRoutes)
+app.use('/api/timings', requireAuth, requireWriteAccess, timingRoutes)
 
 app.get('/api/health', (_req, res) => {
   res.header('Access-Control-Allow-Origin', '*')
@@ -87,10 +91,17 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: err.message || 'Internal server error' })
 })
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-  console.log(`Environment: ${process.env.NODE_ENV}`)
-  console.log(`Database: ${process.env.DATABASE_URL ? 'configured' : 'NOT configured'}`)
-})
+initializeDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`)
+      console.log(`Environment: ${process.env.NODE_ENV}`)
+      console.log(`Database: ${process.env.DATABASE_URL ? 'configured' : 'NOT configured'}`)
+    })
+  })
+  .catch((error) => {
+    console.error('Database initialization failed:', error)
+    process.exit(1)
+  })
 
 export default app

@@ -33,7 +33,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/:id/approve', async (req: Request, res: Response) => {
   const withdrawal = await prisma.withdrawRequest.findUnique({
     where: { id: parseInt(req.params.id) },
-    include: { user: true },
+    include: { user: { select: { id: true, walletBalance: true } } },
   })
   if (!withdrawal) { res.status(404).json({ error: 'Not found' }); return }
   if (withdrawal.status !== 'pending') {

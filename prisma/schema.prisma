@@ -7,11 +7,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum AccessRole {
+  ADMIN
+  VIEWER
+}
+
 model User {
   id            Int     @id @default(autoincrement())
   mobile        String  @unique
   name          String
-  mpin          String
+  mpinHash      String
   walletBalance Decimal @default(0) @db.Decimal(12, 2)
   isActive      Boolean @default(true)
   isBanned      Boolean @default(false)
@@ -25,11 +30,15 @@ model User {
 }
 
 model Admin {
-  id            Int      @id @default(autoincrement())
-  username      String   @unique
+  id            Int        @id @default(autoincrement())
+  username      String     @unique
   passwordHash  String
-  walletBalance Decimal  @default(0) @db.Decimal(12, 2)
-  createdAt     DateTime @default(now())
+  walletBalance Decimal    @default(0) @db.Decimal(12, 2)
+  role             AccessRole @default(ADMIN)
+  tokenVersion     Int        @default(0)
+  failedLoginCount Int        @default(0)
+  lockedUntil      DateTime?
+  createdAt        DateTime   @default(now())
 }
 
 model Market {

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { AccessRole, PrismaClient } from '@prisma/client'
 import bcrypt from 'bcrypt'
 
 const prisma = new PrismaClient()
@@ -32,13 +32,18 @@ async function main() {
   console.log('Seeding database...')
 
   // Admin
-  const passwordHash = await bcrypt.hash('admin@123', 10)
+  const username = process.env.INITIAL_ADMIN_USERNAME
+  const password = process.env.INITIAL_ADMIN_PASSWORD
+  if (!username || !password || password.length < 12) {
+    throw new Error('Set INITIAL_ADMIN_USERNAME and an INITIAL_ADMIN_PASSWORD of at least 12 characters')
+  }
+  const passwordHash = await bcrypt.hash(password, 12)
   await prisma.admin.upsert({
-    where: { username: 'admin' },
-    update: {},
-    create: { username: 'admin', passwordHash, walletBalance: 2632392.0 },
+    where: { username },
+    update: { role: AccessRole.ADMIN },
+    create: { username, passwordHash, walletBalance: 2632392.0, role: AccessRole.ADMIN },
   })
-  console.log('✓ Admin created (username: admin, password: admin@123)')
+  console.log('Admin account is ready')
 
   // Game rates
   await prisma.gameRate.upsert({
@@ -71,18 +76,13 @@ async function main() {
   console.log(`✓ ${markets.length} markets seeded`)
 
   // Sample users
-  const users = [
-    { mobile: '9664963428', name: 'vishal', mpin: '1234', walletBalance: 300 },
-    { mobile: '7869688234', name: 'sanjay Kumar sahu', mpin: '5678', walletBalance: 1500 },
-    { mobile: '7995174358', name: 'ailmbas', mpin: '4321', walletBalance: 800 },
-    { mobile: '1234567890', name: 'GANESH', mpin: '9850', walletBalance: 5665 },
-    { mobile: '6262565620', name: 'Ajit Singh', mpin: '5555', walletBalance: 0 },
-  ]
-  for (const u of users) {
+  const users: { mobile: string; name: string; mpin: string; walletBalance: number }[] = []
+  for (const { mpin, ...user } of users) {
+    const mpinHash = await bcrypt.hash(mpin, 12)
     await prisma.user.upsert({
-      where: { mobile: u.mobile },
+      where: { mobile: user.mobile },
       update: {},
-      create: u,
+      create: { ...user, mpinHash },
     })
   }
   console.log(`✓ ${users.length} sample users seeded`)

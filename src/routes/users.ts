@@ -1,7 +1,13 @@
+import { User } from '@prisma/client'
 import { Router, Request, Response } from 'express'
+import bcrypt from 'bcrypt'
 import prisma from '../lib/prisma'
 
 const router = Router()
+
+function toSafeUser({ mpinHash: _mpinHash, ...user }: User) {
+  return user
+}
 
 router.get('/', async (req: Request, res: Response) => {
   const { search, page = '1', limit = '50' } = req.query
@@ -34,23 +40,42 @@ router.get('/', async (req: Request, res: Response) => {
 })
 
 router.post('/', async (req: Request, res: Response) => {
-  const { mobile, name, mpin } = req.body
-  if (!mobile || !name || !mpin) {
-    res.status(400).json({ error: 'mobile, name and mpin are required' })
+  const mobile = typeof req.body.mobile === 'string' ? req.body.mobile.trim() : ''
+  const name = typeof req.body.name === 'string' ? req.body.name.trim() : ''
+  const mpin = typeof req.body.mpin === 'string' ? req.body.mpin : ''
+  if (!/^\d{10}$/.test(mobile) || !name || !/^\d{4}$/.test(mpin)) {
+    res.status(400).json({ error: 'A name, 10-digit mobile number and 4-digit MPIN are required' })
     return
   }
 
   const existing = await prisma.user.findUnique({ where: { mobile } })
   if (existing) { res.status(409).json({ error: 'Mobile already registered' }); return }
 
-  const user = await prisma.user.create({ data: { mobile, name, mpin } })
-  res.status(201).json(user)
+  const mpinHash = await bcrypt.hash(mpin, 12)
+  const user = await prisma.user.create({ data: { mobile, name, mpinHash } })
+  res.status(201).json({
+    id: user.id,
+    mobile: user.mobile,
+    name: user.name,
+    walletBalance: user.walletBalance,
+    isActive: user.isActive,
+    isBanned: user.isBanned,
+    createdAt: user.createdAt,
+  })
 })
 
 router.get('/:id', async (req: Request, res: Response) => {
   const user = await prisma.user.findUnique({
     where: { id: parseInt(req.params.id) },
-    include: {
+    select: {
+      id: true,
+      mobile: true,
+      name: true,
+      walletBalance: true,
+      isActive: true,
+      isBanned: true,
+      createdAt: true,
+      updatedAt: true,
       walletTransactions: { orderBy: { createdAt: 'desc' }, take: 20 },
       depositRequests: { orderBy: { createdAt: 'desc' }, take: 10 },
       withdrawRequests: { orderBy: { createdAt: 'desc' }, take: 10 },
@@ -61,12 +86,33 @@ router.get('/:id', async (req: Request, res: Response) => {
 })
 
 router.put('/:id', async (req: Request, res: Response) => {
-  const { name, mobile, mpin } = req.body
+  const id = parseInt(req.params.id)
+  const name = typeof req.body.name === 'string' ? req.body.name.trim() : undefined
+  const mobile = typeof req.body.mobile === 'string' ? req.body.mobile.trim() : undefined
+  const mpin = typeof req.body.mpin === 'string' && req.body.mpin ? req.body.mpin : undefined
+  if (mobile && !/^\d{10}$/.test(mobile)) {
+    res.status(400).json({ error: 'Mobile must contain 10 digits' })
+    return
+  }
+  if (mpin && !/^\d{4}$/.test(mpin)) {
+    res.status(400).json({ error: 'MPIN must contain 4 digits' })
+    return
+  }
+
+  const mpinHash = mpin ? await bcrypt.hash(mpin, 12) : undefined
   const user = await prisma.user.update({
-    where: { id: parseInt(req.params.id) },
-    data: { name, mobile, mpin },
+    where: { id },
+    data: { name, mobile, mpinHash },
   })
-  res.json(user)
+  res.json({
+    id: user.id,
+    mobile: user.mobile,
+    name: user.name,
+    walletBalance: user.walletBalance,
+    isActive: user.isActive,
+    isBanned: user.isBanned,
+    createdAt: user.createdAt,
+  })
 })
 
 router.delete('/:id', async (req: Request, res: Response) => {
@@ -82,7 +128,7 @@ router.patch('/:id/ban', async (req: Request, res: Response) => {
     where: { id: user.id },
     data: { isBanned: !user.isBanned },
   })
-  res.json(updated)
+  res.json(toSafeUser(updated))
 })
 
 router.post('/:id/add-points', async (req: Request, res: Response) => {
@@ -113,7 +159,7 @@ router.post('/:id/add-points', async (req: Request, res: Response) => {
       },
     }),
   ])
-  res.json(updatedUser)
+  res.json(toSafeUser(updatedUser))
 })
 
 router.post('/:id/withdraw-points', async (req: Request, res: Response) => {
@@ -148,7 +194,7 @@ router.post('/:id/withdraw-points', async (req: Request, res: Response) => {
       },
     }),
   ])
-  res.json(updatedUser)
+  res.json(toSafeUser(updatedUser))
 })
 
 export default router
