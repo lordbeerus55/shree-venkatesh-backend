@@ -13,15 +13,21 @@ enum AccessRole {
 }
 
 model User {
-  id            Int     @id @default(autoincrement())
-  mobile        String  @unique
-  name          String
-  mpinHash      String
-  walletBalance Decimal @default(0) @db.Decimal(12, 2)
-  isActive      Boolean @default(true)
-  isBanned      Boolean @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               Int      @id @default(autoincrement())
+  mobile           String   @unique
+  name             String
+  username         String?  @unique
+  mpinHash         String
+  passwordHash     String?
+  walletBalance    Decimal  @default(0) @db.Decimal(12, 2)
+  fundsReserved    Decimal  @default(0) @db.Decimal(12, 2)
+  tokenVersion     Int      @default(0)
+  failedLoginCount Int      @default(0)
+  lockedUntil      DateTime?
+  isActive         Boolean  @default(true)
+  isBanned         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   bids               Bid[]
   walletTransactions WalletTransaction[]
@@ -107,14 +113,18 @@ model Bid {
   session       String
   gameType      String
   number        String
-  amount        Decimal  @db.Decimal(10, 2)
-  status        String   @default("pending")
-  winningAmount Decimal  @default(0) @db.Decimal(12, 2)
-  createdAt     DateTime @default(now())
+  amount           Decimal  @db.Decimal(10, 2)
+  payoutMultiplier Decimal  @db.Decimal(12, 2)
+  idempotencyKey   String?
+  status           String   @default("pending")
+  winningAmount    Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt        DateTime @default(now())
 
   user   User    @relation(fields: [userId], references: [id])
   market Market  @relation(fields: [marketId], references: [id])
   result Result? @relation(fields: [resultId], references: [id])
+
+  @@unique([userId, idempotencyKey])
 }
 
 model WalletTransaction {
@@ -139,12 +149,15 @@ model DepositRequest {
   paymentMethod  String?
   transactionRef String?
   proofImageUrl  String?
+  idempotencyKey String?
   status         String    @default("pending")
   adminRemark    String?
   createdAt      DateTime  @default(now())
   processedAt    DateTime?
 
   user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, idempotencyKey])
 }
 
 model WithdrawRequest {
@@ -155,12 +168,16 @@ model WithdrawRequest {
   accountNumber  String?
   ifscCode       String?
   upiId          String?
+  idempotencyKey String?
+  fundsReserved  Boolean   @default(false)
   status         String    @default("pending")
   adminRemark    String?
   createdAt      DateTime  @default(now())
   processedAt    DateTime?
 
   user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, idempotencyKey])
 }
 
 model Notification {

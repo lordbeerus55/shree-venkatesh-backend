@@ -1,7 +1,9 @@
 import 'dotenv/config'
+import 'express-async-errors'
 import express from 'express'
 import path from 'path'
 import { requireAdmin, requireAuth, requireWriteAccess } from './middleware/auth'
+import { requireCustomer } from './middleware/customerAuth'
 import { initializeDatabase } from './lib/prisma'
 
 import authRoutes from './routes/auth'
@@ -21,6 +23,8 @@ import settingRoutes from './routes/settings'
 import contentRoutes from './routes/contents'
 import paymentRoutes from './routes/payments'
 import timingRoutes from './routes/timings'
+import customerAuthRoutes from './routes/customerAuth'
+import customerRoutes from './routes/customer'
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -63,6 +67,9 @@ app.use('/api/auth', (req, res, next) => {
   next()
 }, authRoutes)
 
+app.use('/api/customer/auth', customerAuthRoutes)
+app.use('/api/customer', requireCustomer, customerRoutes)
+
 app.use('/api/accounts', requireAuth, requireAdmin, accountRoutes)
 app.use('/api/users', requireAuth, requireWriteAccess, userRoutes)
 app.use('/api/markets', requireAuth, requireWriteAccess, marketRoutes)
@@ -85,10 +92,14 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', cors: 'enabled' })
 })
 
+app.use((_req, res) => {
+  res.status(404).json({ error: 'Not found' })
+})
+
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Error:', err.message)
   console.error(err.stack)
-  res.status(500).json({ error: err.message || 'Internal server error' })
+  res.status(500).json({ error: 'Internal server error' })
 })
 
 initializeDatabase()
